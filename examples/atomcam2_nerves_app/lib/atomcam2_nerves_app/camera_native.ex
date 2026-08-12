@@ -4,10 +4,11 @@ defmodule Atomcam2NervesApp.CameraNative do
 
   Drives the iCamera_app-free pipeline: loads the camera kernel modules,
   then supervises `atomcam2-camd` (libimp capture + H.264 encode into
-  v4l2loopback) and `v4l2rtspserver` as OS processes via
-  `MuonTrap.Daemon`, restarting them if they exit. Everything needed
-  lives in the rootfs, /atom, and /tmp, so the camera comes up even while
-  a long /data filesystem check is still running.
+  v4l2loopback), `atomcam2-aicap` (libimp IMP_AI mic capture into a
+  FIFO, see docs/20260812_RTSP_音声追加_提案書.md), and `v4l2rtspserver`
+  as OS processes via `MuonTrap.Daemon`, restarting them if they exit.
+  Everything needed lives in the rootfs, /atom, and /tmp, so the camera
+  comes up even while a long /data filesystem check is still running.
 
   Auto-start is opt-out: `/data/atomcam2-native-camera/auto-start.conf`
   with `enabled=false` disables it; a missing (or not yet mounted) file
@@ -30,7 +31,22 @@ defmodule Atomcam2NervesApp.CameraNative do
   # daemon supervisor starts it again.
   @camd_frames "2000000000"
   @camd_args [@camd_frames, @loopback_device, "gc2053", "0x37"]
-  @rtsp_args ["-Q", "2", "-P", "8554", @loopback_device]
+
+  # Mic capture daemon (package/atomcam2-aicap): continuously polls IMP_AI
+  # and writes S16_BE PCM into a FIFO. v4l2rtspserver's ALSA-free
+  # FifoAudioCapture (package/v4l2rtspserver/0004-fifo-audio-source.patch)
+  # reads the other end and publishes it as an "audio/L16" RTP subsession.
+  # Independent of camd/video readiness -- no camd_ready/camd_go gating.
+  @aicap_path "/usr/bin/atomcam2-aicap"
+  @audio_fifo_path "/tmp/camd-audio.fifo"
+  @audio_sample_rate "8000"
+  @aicap_args [@audio_fifo_path, @audio_sample_rate]
+  @aicap_restart_ms 5_000
+
+  # Device argument keeps v4l2rtspserver's own "[V4L2 device][,audio
+  # device]" convention (see main.cpp's decodeDevice()); the part after
+  # the comma is our FIFO path instead of an ALSA device name.
+  @rtsp_args ["-Q", "2", "-P", "8554", "#{@loopback_device},#{@audio_fifo_path}"]
 
   # camd runtime control: one command per line written to the control
   # file; a snapshot request is a marker file camd polls, and the JPEG it
@@ -96,6 +112,7 @@ defmodule Atomcam2NervesApp.CameraNative do
   defstruct phase: :not_checked,
             camd_pid: nil,
             rtsp_pid: nil,
+            aicap_pid: nil,
             last_error: nil,
             cpu_sample: nil,
             rtsp_fails: 0
@@ -232,6 +249,10 @@ defmodule Atomcam2NervesApp.CameraNative do
     {:noreply, start_rtsp(state)}
   end
 
+  def handle_info(:start_aicap, state) do
+    {:noreply, start_aicap(state)}
+  end
+
   def handle_info(:camd_go, state) do
     _ = File.write(@camd_go_path, "")
     {:noreply, state}
@@ -275,6 +296,12 @@ defmodule Atomcam2NervesApp.CameraNative do
     Logger.warning("v4l2rtspserver exited (#{inspect(reason)}); restarting")
     Process.send_after(self(), :start_rtsp, @poll_interval_ms)
     {:noreply, %{state | rtsp_pid: nil, phase: :degraded}}
+  end
+
+  def handle_info({:EXIT, pid, reason}, %{aicap_pid: pid} = state) do
+    Logger.warning("atomcam2-aicap exited (#{inspect(reason)}); restarting")
+    Process.send_after(self(), :start_aicap, @aicap_restart_ms)
+    {:noreply, %{state | aicap_pid: nil}}
   end
 
   def handle_info(_message, state) do
@@ -402,6 +429,7 @@ defmodule Atomcam2NervesApp.CameraNative do
       Process.send_after(self(), :start_rtsp, @rtsp_poll_ms)
       Logger.info("Native camera started (camd)")
       %{state | phase: :starting, camd_pid: camd_pid, last_error: nil}
+      |> start_aicap()
     else
       {:error, reason} ->
         Logger.warning("Native camera start failed: #{inspect(reason)}")
@@ -454,6 +482,33 @@ defmodule Atomcam2NervesApp.CameraNative do
       log_prefix: "camd: ",
       stderr_to_stdout: true
     )
+  end
+
+  # Best-effort: audio is additive on top of the video pipeline, so a
+  # failure here (missing binary on an older firmware slot, IMP_AI busy,
+  # etc.) logs a warning and retries instead of failing camera startup.
+  defp start_aicap(%{aicap_pid: aicap_pid} = state) when is_pid(aicap_pid) do
+    if alive?(aicap_pid), do: state, else: start_aicap(%{state | aicap_pid: nil})
+  end
+
+  defp start_aicap(state) do
+    case MuonTrap.Daemon.start_link(
+           @aicap_path,
+           @aicap_args,
+           env: [{"LD_LIBRARY_PATH", @ld_library_path}],
+           log_output: :debug,
+           log_prefix: "aicap: ",
+           stderr_to_stdout: true
+         ) do
+      {:ok, pid} ->
+        Logger.info("Mic capture started (aicap)")
+        %{state | aicap_pid: pid}
+
+      {:error, reason} ->
+        Logger.warning("atomcam2-aicap start failed: #{inspect(reason)}")
+        Process.send_after(self(), :start_aicap, @aicap_restart_ms)
+        state
+    end
   end
 
   defp enabled? do

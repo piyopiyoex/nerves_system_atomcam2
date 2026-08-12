@@ -3,8 +3,13 @@
 # v4l2rtspserver
 #
 # RTSP server that publishes the already-encoded frames the vendor camera
-# runtime writes into the v4l2loopback devices. Video only: the control
-# kernel provides OSS rather than ALSA, so audio capture is not built.
+# runtime writes into the v4l2loopback devices. Upstream's ALSA audio
+# path is not built (0002-video-only-makefile.patch): the control
+# kernel provides OSS rather than ALSA. Audio is instead published via
+# an ALSA-free FIFO source (0004-fifo-audio-source.patch) fed by the
+# atomcam2-aicap daemon (package/atomcam2-aicap/), which does the
+# actual IMP_AI microphone capture. See
+# docs/20260812_RTSP_音声追加_提案書.md.
 #
 ################################################################################
 

@@ -127,26 +127,6 @@ defmodule Atomcam2NervesApp.Dashboard.View do
             if (status) status.textContent = label + ': 通信エラー';
           });
         };
-        // Mic record/play: the server starts the action and returns its
-        // duration; the countdown itself runs here instead of on a
-        // server-rendered countdown page.
-        window.postMic = function (url, label, statusId) {
-          var status = document.getElementById(statusId || 'hwtest-status');
-          if (status) status.textContent = label + ': 実行中...';
-          fetch(url, {method: 'POST'}).then(function (r) { return r.json(); }).then(function (res) {
-            var secs = res.seconds || 0, n = 0;
-            if (!status) return;
-            status.textContent = label + ': 0 / ' + secs + ' 秒';
-            var t = setInterval(function () {
-              n++;
-              if (!status) { clearInterval(t); return; }
-              if (n >= secs) { clearInterval(t); status.textContent = label + ': 完了'; }
-              else { status.textContent = label + ': ' + n + ' / ' + secs + ' 秒'; }
-            }, 1000);
-          }).catch(function () {
-            if (status) status.textContent = label + ': 通信エラー';
-          });
-        };
       </script>
     </body>
     </html>
@@ -192,8 +172,6 @@ defmodule Atomcam2NervesApp.Dashboard.View do
       <button type="button" onclick="postOp('/test/yellow', null, '黄 LED 点滅', 'hwtest-status')">黄 LED 点滅</button>
       <button type="button" onclick="postOp('/test/ir_led', null, 'IR LED 点滅', 'hwtest-status')">IR LED 点滅</button>
       <button type="button" onclick="postOp('/test/speaker', null, 'スピーカー(発声)', 'hwtest-status')">スピーカー(発声)</button>
-      <button type="button" onclick="postMic('/test/mic/record', '録音中', 'hwtest-status')">マイク録音(5秒)</button>
-      <button type="button" onclick="postMic('/test/mic/play', '再生中', 'hwtest-status')">録音を再生</button>
       <button type="button" onclick="postOp('/test/ircut/on', null, 'IR-cut ON', 'hwtest-status')">IR-cut ON</button>
       <button type="button" onclick="postOp('/test/ircut/off', null, 'IR-cut OFF', 'hwtest-status')">IR-cut OFF</button>
       <button type="button"
@@ -206,7 +184,7 @@ defmodule Atomcam2NervesApp.Dashboard.View do
       <tr><td>黄 LED</td><td>GPIO 38 (active-low)</td></tr>
       <tr><td>IR LED</td><td>GPIO 26（肉眼不可・スマホカメラで確認）</td></tr>
       <tr><td>スピーカー</td><td>アンプ GPIO 63・「起動しました」を再生</td></tr>
-      <tr><td>マイク</td><td>IMP_AI(8kHz/16bit/mono)。録音(5秒)と再生を個別に実行・秒カウント表示</td></tr>
+      <tr><td>マイク</td><td>IMP_AI(8kHz/16bit/mono)。常時 RTSP 音声(audio/L16)として配信、単体テストボタンは廃止</td></tr>
       <tr><td>IR-cut フィルタ</td><td>GPIO 53/52 Hブリッジ・ON=昼(IR遮断) / OFF=夜(IR透過)</td></tr>
       <tr><td>夜間ビジョン</td><td>操作は「映像」タブへ移動。IR-cut + IR LED のみ(ISP 昼夜モードは呼ばない。RTSP を止めていた旧実装から修正済み)</td></tr>
     </table>

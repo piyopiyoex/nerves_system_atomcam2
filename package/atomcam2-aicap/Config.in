@@ -1,0 +1,7 @@
+config BR2_PACKAGE_ATOMCAM2_AICAP
+	bool "atomcam2-aicap"
+	help
+	  Install the prebuilt continuous microphone capture daemon
+	  (atomcam2-aicap), which feeds raw PCM into a FIFO for
+	  v4l2rtspserver's ALSA-free audio subsession to publish over
+	  RTSP.
