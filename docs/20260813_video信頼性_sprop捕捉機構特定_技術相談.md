@@ -1,5 +1,18 @@
 # 2026-08-13 映像信頼性(sprop 捕捉機構の誤認)技術相談(セカンドオピニオン依頼)
 
+> **結論(TL;DR、2026-08-13 解決済み)**: 「T31 エンコーダは SPS/PPS を
+> 起動時に一度しか出さない」という前提は誤りで、実際は毎 IDR 前に
+> 自然に含まれている(§2)。真因は `v4l2rtspserver`(live555)側:
+> 最初の `DESCRIBE` が camd の初回フレーム到達より前に来ると、
+> `OnDemandServerMediaSubsession::fSDPLines` に空の sprop が**プロセス
+> 寿命中ずっと固定キャッシュ**される起動時レースだった。`this` ポインタ
+> 追跡で同一オブジェクトであることを実機確認し「別インスタンス説」を
+> 排除(§14)。**camd の frame1 write() リトライ(VERSION 37)** と
+> **v4l2rtspserver への `0005-sprop-startup-race-fix.patch`**(sprop が
+> 空なら最大 3 秒リトライ待機してから SDP 構築)の 2 点で修正、独立した
+> 実機 2 台・合計 7/7 回の再起動で sprop 正常出力を確認済み(§15-16、
+> commit `acbab4b`)。
+
 「音声は聞こえるが映像が映らない」を解消するため、RTSP の SDP
 `sprop-parameter-sets` 捕捉レース([[atomcam2-rtsp]]、
 [docs/20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md](20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md)

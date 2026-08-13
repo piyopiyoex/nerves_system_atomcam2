@@ -2,6 +2,46 @@
 
 ## 未公開
 
+- Actually fix the intermittent missing `sprop-parameter-sets` in the
+  RTSP SDP for good (the 2026-08-05 "GO handshake" entry below reduced
+  but did not eliminate the race — see
+  [docs/20260813_video信頼性_sprop捕捉機構特定_技術相談.md](docs/20260813_video信頼性_sprop捕捉機構特定_技術相談.md)
+  for the full investigation, including two second-opinion rounds and a
+  disproven hypothesis that camd's encoder only emits SPS/PPS once).
+  Root cause: the very first RTSP `DESCRIBE` can race camd's first
+  frame; if it wins, `v4l2rtspserver`'s SDP line is built empty and
+  cached for that process's entire lifetime (never recomputed). Fixed
+  with two changes: camd (VERSION 37) now retries a frame1 `write()`
+  that fails with `ENOTTY` (no reader attached yet) for up to 5 s
+  instead of silently dropping it, and `v4l2rtspserver` gained a local
+  patch (`0004`→`0005`, `0005-sprop-startup-race-fix.patch`) that waits
+  up to 3 s for the capture source to have SPS/PPS before building the
+  SDP line. Verified on two independent physical units (7/7 consecutive
+  reboots, sprop present and VLC decoding every time).
+- Fix a self-inflicted RTSP restart loop: the existing sprop-liveness
+  watchdog rebuilt the whole camd+v4l2rtspserver stack on any single
+  missing-sprop check, which both re-rolled the (then still probabilistic)
+  sprop race and re-triggered a few seconds of inherent restart-transition
+  instability in v4l2rtspserver — looking like a permanent crash-loop but
+  actually a self-amplifying loop. The watchdog now escalates "server
+  unreachable" (fast, ~1 min) and "reachable but no sprop" (a ~5-minute
+  grace period, since sprop-less video can often still decode via in-band
+  NAL recovery) separately, and logs full diagnostic detail
+  (connect/response/elapsed/sdp size/sprop) on every check. See
+  [docs/20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md](docs/20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md).
+- Add microphone audio to the RTSP stream. A new always-on daemon,
+  `atomcam2-aicap`, polls the mic via libimp's `IMP_AI_*` API (the same
+  8 kHz/16-bit/mono path the one-shot "record mic" hardware test used)
+  and writes raw big-endian PCM into a FIFO; a local `v4l2rtspserver`
+  patch (`0004-fifo-audio-source.patch`) adds an ALSA-free
+  `FifoAudioCapture` source that publishes it as an `audio/L16` RTP
+  subsession alongside the existing H.264 video, with no ALSA
+  dependency (the control kernel has none). The one-shot "record mic
+  (5s)" hardware-test button is retired in favor of listening to the
+  live RTSP audio, since it can no longer coexist with the always-on
+  capture (`IMP_AI` is exclusive). See
+  [docs/20260812_RTSP_音声追加_提案書.md](docs/20260812_RTSP_音声追加_提案書.md).
+
 > 既知の不具合(2026-08-04→2026-08-05 更新): (A) ナイトビジョン切替が
 > H.264 を停止させる(有力仮説: `SetISPRunningMode` のインライン実行。
 > IR-cut+IR LED のみに変更で緩和)、(B) camd の kill・ソフト再起動反復後に

@@ -1,5 +1,16 @@
 # 2026-08-13 v4l2rtspserver epipe クラッシュループ 技術相談(セカンドオピニオン依頼)
 
+> **結論(TL;DR、2026-08-13 解決済み)**: crash-loop の正体は
+> `v4l2rtspserver` の自壊ではなく、**sprop 捕捉の確率的レースに
+> watchdog が負けるたびに `restart_stack()` を呼び、その再起動「遷移」
+> 自体が持つ数秒の固有不安定性を再点火する自己増幅ループ**だった
+> (§8.5-8.6)。**watchdog を「サーバ無応答」と「sprop 欠落のみ」の
+> 二段階に分離**(サーバ無応答は即 rebuild、sprop 欠落のみは約 5 分の
+> 猶予を置いてから rebuild)し、`camera_native.ex` に実装・実機確認
+> 済み(§9〜9.1、commit `34e2ff9`)。sprop 捕捉レース自体の根本原因は
+> 別ドキュメント([映像信頼性・sprop 捕捉機構特定 技術相談](20260813_video信頼性_sprop捕捉機構特定_技術相談.md))
+> で追跡・修正済み(commit `acbab4b`)。音声機能自体は無実(§1-4)。
+
 RTSP へのマイク音声追加([RTSP 音声追加 提案書](20260812_RTSP_音声追加_提案書.md)、
 `atomcam2-aicap` + `0004-fifo-audio-source.patch`)の実機検証中に、
 **`v4l2rtspserver` が `:epipe` で頻繁に終了・再起動を繰り返す**不安定化に

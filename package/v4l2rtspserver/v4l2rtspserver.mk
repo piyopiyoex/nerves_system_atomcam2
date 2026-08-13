@@ -11,6 +11,12 @@
 # actual IMP_AI microphone capture. See
 # docs/20260812_RTSP_音声追加_提案書.md.
 #
+# 0005-sprop-startup-race-fix.patch: waits (bounded) for the capture
+# source to have SPS/PPS before building the SDP's sprop-parameter-sets
+# line, since the very first DESCRIBE can otherwise race the encoder's
+# first frame and leave it permanently empty for that process's
+# lifetime. See docs/20260813_video信頼性_sprop捕捉機構特定_技術相談.md.
+#
 ################################################################################
 
 V4L2RTSPSERVER_VERSION = ce808915edfd9ec934af351efe739dd9a07a07e5
