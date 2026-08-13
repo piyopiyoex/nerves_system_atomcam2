@@ -487,6 +487,35 @@ RTSP health check: connect=true response=true elapsed_ms=1513 sdp_bytes=737 spro
 を確認済み。5 分間のフルサイクル完走・実際に rebuild がトリガーされる
 挙動までは本ドキュメント執筆時点では未確認 — 今後の長時間観察課題。)
 
+### 9.1 フルサイクルの実機確認(同日、追加観察)
+
+上記の投入後、そのまま観察を継続したところ、`sprop_fails` が
+0 → 1 → … → 14 まで一貫して 20 秒間隔で増加し、しきい値 15 に到達した
+時点で設計通り rebuild が発火した:
+
+```
+RTSP health check: ... sprop=false dead_fails=0 sprop_fails=13
+RTSP health check: ... sprop=false dead_fails=0 sprop_fails=14
+RTSP sprop-parameter-sets still missing after sustained grace period; rebuilding stack
+RTSP health check: connect=true response=true elapsed_ms=1504 sdp_bytes=843 sprop=true dead_fails=0 sprop_fails=0
+RTSP health check: ... sprop=true dead_fails=0 sprop_fails=0   (以降 4 回連続で健全)
+```
+
+rebuild 後の新インスタンスは **sprop 捕捉に成功**し(SDP に
+`sprop-parameter-sets=J00AM+dAPAET8s1AQEB8AAADAAQAAAMAyMkAAehIAAtxt//wKA==,KO48gA==`
+が出現)、以後 `sprop_fails` は 0 のまま安定継続(uptime 475 秒超、
+クラッシュ無し)。ユーザが VLC で確認した「映像が映った」はこの正常
+復旧に一致する。
+
+**§8 の未解明事項だった「5 分猶予後の rebuild が実際にどう振る舞うか」
+まで含めて実機で確認できた**: 猶予期間中はプロセス安定(クラッシュ
+無し)、猶予明けの rebuild も(今回は)`:epipe` 連鎖に陥ることなく一発で
+成功した。二段階 watchdog は設計通り機能していると判断してよい。
+
+継続課題として残るのは、rebuild 自体が §8.3 のように `:normal`/`:epipe`
+連鎖を伴うケース(今回は伴わなかった)がどの頻度で起きるか、長期運用
+(数時間〜数日)での再現性確認。
+
 ## 参考
 
 - [RTSP 音声追加 提案書](20260812_RTSP_音声追加_提案書.md)
