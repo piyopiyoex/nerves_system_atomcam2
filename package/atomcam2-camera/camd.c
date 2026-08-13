@@ -70,7 +70,7 @@
 #define GRP 0
 /* Keep in sync with ATOMCAM2_CAMERA_VERSION in atomcam2-camera.mk -- bump
  * both together so the running binary can report which build it is. */
-#define CAMD_VERSION 36
+#define CAMD_VERSION 37
 #define VERSION_PATH "/tmp/camd.version"
 /* Measured (not nominal) encoder fps, updated once per wall-clock second --
  * decoupled from the "once per FR_NUM iterations" heuristic used elsewhere,
@@ -798,7 +798,31 @@ int main(int argc, char **argv)
 			}
 			len += pk->length;
 		}
-		if (len > 0 && write(lfd, asm_buf, len) > 0) { total += len; got++; }
+		if (len > 0) {
+			/* Until the first frame is successfully delivered, the reader
+			 * may not have fully armed the loopback yet even though
+			 * GO_PATH exists (that's a fixed-delay heuristic, not a
+			 * completion signal -- see the GO_PATH wait above). Retry a
+			 * write() that fails with ENOTTY (no reader attached yet)
+			 * instead of silently dropping it, since this frame carries
+			 * the SPS/PPS this boot's sprop capture depends on. Bounded
+			 * so a genuinely reader-less boot still falls through and
+			 * runs normally. */
+			int wrote = 0, retry_ms = 0;
+			for (;;) {
+				if (write(lfd, asm_buf, len) > 0) { wrote = 1; break; }
+				if (got > 0 || errno != ENOTTY || retry_ms >= 5000) break;
+				usleep(50 * 1000);
+				retry_ms += 50;
+			}
+			if (wrote) {
+				total += len; got++;
+			} else if (got == 0) {
+				fprintf(stderr, "camd: frame1 write failed after %d ms (errno=%d %s)\n",
+					retry_ms, errno, strerror(errno));
+				fflush(stderr);
+			}
+		}
 
 		{
 			time_t now = time(NULL);

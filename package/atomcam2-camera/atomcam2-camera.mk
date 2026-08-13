@@ -12,7 +12,7 @@
 # Bump when the prebuilt binary changes: local-site packages are NOT
 # rebuilt on file changes alone, so a stale binary ships silently
 # otherwise.
-ATOMCAM2_CAMERA_VERSION = 36
+ATOMCAM2_CAMERA_VERSION = 37
 ATOMCAM2_CAMERA_SITE = $(NERVES_DEFCONFIG_DIR)/package/atomcam2-camera
 ATOMCAM2_CAMERA_SITE_METHOD = local
 
