@@ -5,7 +5,7 @@ defmodule Atomcam2NervesApp.CameraNative do
   Drives the iCamera_app-free pipeline: loads the camera kernel modules,
   then supervises `atomcam2-camd` (libimp capture + H.264 encode into
   v4l2loopback), `atomcam2-aicap` (libimp IMP_AI mic capture into a
-  FIFO, see docs/20260812_RTSP_音声追加_提案書.md), and `v4l2rtspserver`
+  FIFO, see docs/worklog/20260812-RTSP音声追加の実装.md), and `v4l2rtspserver`
   as OS processes via `MuonTrap.Daemon`, restarting them if they exit.
   Everything needed lives in the rootfs, /atom, and /tmp, so the camera
   comes up even while a long /data filesystem check is still running.
@@ -86,7 +86,7 @@ defmodule Atomcam2NervesApp.CameraNative do
   # reaching for it.
   #
   # Two-tier design (2026-08-13, see
-  # docs/20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md §8):
+  # docs/worklog/20260813-v4l2rtspserverのepipeクラッシュ調査.md §8):
   # a live-and-diagnosed instability loop turned out to be self-inflicted —
   # sprop-parameter-sets capture is a known per-boot probabilistic race
   # ([[atomcam2-rtsp]]), rebuilding on every miss re-rolls that race but

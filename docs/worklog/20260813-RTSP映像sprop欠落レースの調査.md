@@ -1,21 +1,33 @@
-# 2026-08-13 映像信頼性(sprop 捕捉機構の誤認)技術相談(セカンドオピニオン依頼)
+# 2026-08-13 RTSP 映像 sprop 欠落レースの調査
 
-> **結論(TL;DR、2026-08-13 解決済み)**: 「T31 エンコーダは SPS/PPS を
-> 起動時に一度しか出さない」という前提は誤りで、実際は毎 IDR 前に
-> 自然に含まれている(§2)。真因は `v4l2rtspserver`(live555)側:
-> 最初の `DESCRIBE` が camd の初回フレーム到達より前に来ると、
-> `OnDemandServerMediaSubsession::fSDPLines` に空の sprop が**プロセス
-> 寿命中ずっと固定キャッシュ**される起動時レースだった。`this` ポインタ
-> 追跡で同一オブジェクトであることを実機確認し「別インスタンス説」を
-> 排除(§14)。**camd の frame1 write() リトライ(VERSION 37)** と
-> **v4l2rtspserver への `0005-sprop-startup-race-fix.patch`**(sprop が
-> 空なら最大 3 秒リトライ待機してから SDP 構築)の 2 点で修正、独立した
-> 実機 2 台・合計 7/7 回の再起動で sprop 正常出力を確認済み(§15-16、
-> commit `acbab4b`)。
+## 文書情報
+
+- 日付: 2026-08-13
+- 種別: 技術調査
+- 状態: 調査完了
+- 位置づけ: 当時の調査、実装、検証を残す記録。現在の仕様は上位文書を優先する。
+- 現行資料: [構成](../構成.md) / [運用](../運用.md)
+
+セカンドオピニオンを求めながら進めた調査記録(当時の質問書を含む)。
+
+## 結論(TL;DR、2026-08-13 解決済み)
+
+「T31 エンコーダは SPS/PPS を
+起動時に一度しか出さない」という前提は誤りで、実際は毎 IDR 前に
+自然に含まれている(§2)。真因は `v4l2rtspserver`(live555)側:
+最初の `DESCRIBE` が camd の初回フレーム到達より前に来ると、
+`OnDemandServerMediaSubsession::fSDPLines` に空の sprop が**プロセス
+寿命中ずっと固定キャッシュ**される起動時レースだった。`this` ポインタ
+追跡で同一オブジェクトであることを実機確認し「別インスタンス説」を
+排除(§14)。**camd の frame1 write() リトライ(VERSION 37)** と
+**v4l2rtspserver への `0005-sprop-startup-race-fix.patch`**(sprop が
+空なら最大 3 秒リトライ待機してから SDP 構築)の 2 点で修正、独立した
+実機 2 台・合計 7/7 回の再起動で sprop 正常出力を確認済み(§15-16、
+commit `acbab4b`)。
 
 「音声は聞こえるが映像が映らない」を解消するため、RTSP の SDP
 `sprop-parameter-sets` 捕捉レース([[atomcam2-rtsp]]、
-[docs/20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md](20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md)
+[v4l2rtspserver の epipe クラッシュ調査](20260813-v4l2rtspserverのepipeクラッシュ調査.md)
 とは別件)を修正しようと `camd`(`package/atomcam2-camera/camd.c`)へ
 2 点の対策を実装・実機投入した。しかし**実機診断ログにより、当初の
 前提そのものが誤りだったと判明**し、修正は効果が無かった。さらに
@@ -31,7 +43,7 @@ v4l2rtspserver のソースを追ったところ、**sprop 捕捉の実体は当
 
 ## 1. 発端と前提(当初の誤認)
 
-過去のドキュメント([docs/20260805_RTSP_sprop欠落_安定起動_技術相談.md](20260805_RTSP_sprop欠落_安定起動_技術相談.md)
+過去のドキュメント([RTSP 初期情報欠落の調査](20260805-RTSP初期情報欠落の調査.md)
 ほか)に基づき、以下を前提として作業を始めた:
 
 > T31 SDK のエンコーダは SPS/PPS を**起動時に一度だけ**出力し、周期的な
@@ -691,10 +703,10 @@ a=fmtp:96 profile-level-id=4d0033;sprop-parameter-sets=J00AM+dAPAET8s1AQEB8AAADA
 
 ## 参考
 
-- [RTSP 音声追加 提案書](20260812_RTSP_音声追加_提案書.md)
-- [v4l2rtspserver epipe クラッシュループ 技術相談](20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md) — 別件(watchdog 自己増幅ループ)、本件とは独立に解決済み
-- [RTSP sprop 欠落・安定起動 技術相談](20260805_RTSP_sprop欠落_安定起動_技術相談.md) — 2026-08-05 時点の調査(前提となった記述の出典)
-- [sprop 修正・VLC 表示回帰 技術相談](20260805_sprop修正_VLC表示回帰_技術相談.md) — 手動 prepend が過去に撤回された経緯(後日 VPN 問題と判明)
+- [RTSP 音声追加の実装](20260812-RTSP音声追加の実装.md)
+- [v4l2rtspserver の epipe クラッシュ調査](20260813-v4l2rtspserverのepipeクラッシュ調査.md) — 別件(watchdog 自己増幅ループ)、本件とは独立に解決済み
+- [RTSP 初期情報欠落の調査](20260805-RTSP初期情報欠落の調査.md) — 2026-08-05 時点の調査(前提となった記述の出典)
+- [RTSP 修正後の再生回帰調査](20260805-RTSP修正後の再生回帰調査.md) — 手動 prepend が過去に撤回された経緯(後日 VPN 問題と判明)
 - [[atomcam2-rtsp]] — sprop 捕捉の確率的レース、過去の対策一覧
 - [[atomcam2-rtsp-stability]] — RTSP 全般の既知パターン
 - [[atomcam2-canary-device]] / [[atomcam2-device-handling]] / [[atomcam2-control-kernel]]

@@ -53,7 +53,7 @@ iCamera_app を置き換えるネイティブカメラデーモン `atomcam2-cam
   来ると空のまま恒久キャッシュされる)にあり、
   `package/v4l2rtspserver/0005-sprop-startup-race-fix.patch` で対応
   済み。詳細な調査過程は
-  [docs/20260813_video信頼性_sprop捕捉機構特定_技術相談.md](../../docs/20260813_video信頼性_sprop捕捉機構特定_技術相談.md)。
+  [docs/worklog/20260813-RTSP映像sprop欠落レースの調査.md](../../docs/worklog/20260813-RTSP映像sprop欠落レースの調査.md)。
 - **ナイトビジョン** `night on|off|auto`: ISP RunningMode(DAY/NIGHT)+
   IR-cut フィルタ(GPIO 53/52 の H ブリッジをパルス)+ IR LED(GPIO 26)。
   auto は `IMP_ISP_Tuning_GetTotalGain` を毎秒監視し、8x で夜・4x で昼に

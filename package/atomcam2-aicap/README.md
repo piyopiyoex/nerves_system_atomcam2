@@ -5,7 +5,7 @@
 `libimp` の `IMP_AI_*` でマイクを継続的にポーリングし、16bit PCM を
 big-endian(RTP L16)へ変換して名前付きパイプへ書き出す。読み出し側は
 `package/v4l2rtspserver` の `FifoAudioCapture`(0004-fifo-audio-source.patch)。
-詳細は [RTSP 音声追加 提案書](../../docs/20260812_RTSP_音声追加_提案書.md)。
+詳細は [RTSP 音声追加の実装](../../docs/worklog/20260812-RTSP音声追加の実装.md)。
 
 ## 収録物
 
@@ -57,4 +57,4 @@ atomcam2-aicap [fifo] [rate] [gain]
 「マイク録音(5秒)」/「録音を再生」(`HardwareTest.mic_record/0` /
 `mic_play/0`)はこの衝突を避けるため削除済みで、動作確認は RTSP 音声
 (この `aicap` の配信そのもの)で代替する。経緯は
-[RTSP 音声追加 提案書](../../docs/20260812_RTSP_音声追加_提案書.md) 参照。
+[RTSP 音声追加の実装](../../docs/worklog/20260812-RTSP音声追加の実装.md) 参照。

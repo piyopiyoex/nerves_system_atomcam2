@@ -2,7 +2,7 @@
  * Continuously capture the Atom Cam 2 microphone via libimp IMP_AI and
  * write raw S16_BE (network byte order) mono PCM into a named pipe, for
  * v4l2rtspserver's FifoAudioCapture (package/v4l2rtspserver) to publish
- * as an RTP "audio/L16" subsession. See docs/20260812_RTSP_音声追加_提案書.md.
+ * as an RTP "audio/L16" subsession. See docs/worklog/20260812-RTSP音声追加の実装.md.
  *
  * This is airec.c's IMP_AI setup turned into an always-on daemon: instead
  * of recording a fixed duration to a file, it runs forever and pushes
