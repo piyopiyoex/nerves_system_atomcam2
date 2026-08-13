@@ -81,12 +81,35 @@ defmodule Atomcam2NervesApp.CameraNative do
   # port is actually accepting connections. v4l2rtspserver can die (or come
   # up unhealthy after a boot) without MuonTrap noticing the child is gone;
   # when that happens the camera pipeline is fine (snapshots still work) but
-  # VLC shows nothing. After a couple of consecutive failures we rebuild the
-  # whole stack (fresh camd + rtspserver, so sprop is captured again) — a
-  # software self-heal, no power cycle.
+  # VLC shows nothing. A rebuild (fresh camd + rtspserver) is a software
+  # self-heal, no power cycle — but see the two-tier design below before
+  # reaching for it.
+  #
+  # Two-tier design (2026-08-13, see
+  # docs/20260813_v4l2rtspserver_epipeクラッシュループ_技術相談.md §8):
+  # a live-and-diagnosed instability loop turned out to be self-inflicted —
+  # sprop-parameter-sets capture is a known per-boot probabilistic race
+  # ([[atomcam2-rtsp]]), rebuilding on every miss re-rolls that race but
+  # also re-triggers a few seconds of inherent :normal/:epipe churn on each
+  # camd+v4l2rtspserver restart transition, and a bad re-roll starts the
+  # cycle over — a self-amplifying loop that looked like a permanent
+  # crash-loop but wasn't (35 min / 20 checks with rebuilding disabled: zero
+  # instability). Missing sprop also isn't necessarily fatal to playback —
+  # clients can recover it from in-band SPS/PPS NAL units in the stream,
+  # just not as promptly as via SDP.
+  #
+  # So: "alive" (server refuses to answer at all) and "sprop-ready" (server
+  # answers but SDP lacks sprop) are judged and escalated separately.
+  # - alive == false is unambiguous — the port itself is unusable — so it
+  #   keeps the short, original threshold.
+  # - sprop == false alone gets a much longer grace period before rebuilding
+  #   (in-band recovery + avoiding re-triggering transition churn), at the
+  #   cost of playback via SDP-declared sprop being slow to recover on a
+  #   truly stuck instance.
   @rtsp_health_ms 20_000
   @rtsp_port 8554
-  @rtsp_fail_threshold 2
+  @rtsp_dead_fail_threshold 2
+  @rtsp_sprop_fail_threshold 15
   # Debug overlay on the video (top-left): an IEx-greeting-sized system
   # summary, refreshed every few seconds. On by default; toggle with
   # osd_debug/1 or the conf file (the persisted choice wins once set).
@@ -115,7 +138,8 @@ defmodule Atomcam2NervesApp.CameraNative do
             aicap_pid: nil,
             last_error: nil,
             cpu_sample: nil,
-            rtsp_fails: 0
+            rtsp_dead_fails: 0,
+            rtsp_sprop_fails: 0
 
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(options \\ []) do
@@ -314,56 +338,102 @@ defmodule Atomcam2NervesApp.CameraNative do
   end
 
   # RTSP watchdog: only meaningful once the stack is up (camd running and
-  # the RTSP server expected). If the port is not accepting connections for
-  # a couple of checks in a row, rebuild the whole stack so a fresh camd +
-  # rtspserver re-run the SPS handshake — the camera pipeline itself may be
-  # fine (snapshots work), only the RTSP publish is dead.
+  # the RTSP server expected). Two tiers, escalated independently (see the
+  # module doc for why): a genuinely unreachable server rebuilds quickly;
+  # a reachable server merely missing sprop gets a long grace period before
+  # rebuilding, since it isn't necessarily broken (in-band SPS/PPS recovery)
+  # and rebuilding both re-rolls the sprop race and re-triggers a few
+  # seconds of restart-transition churn.
   defp rtsp_health(%{phase: :running} = state) do
-    cond do
-      not alive?(state.camd_pid) ->
-        %{state | rtsp_fails: 0}
-
-      rtsp_healthy?() ->
-        %{state | rtsp_fails: 0}
-
-      state.rtsp_fails + 1 >= @rtsp_fail_threshold ->
-        Logger.warning("RTSP unhealthy (down or no sprop) while camera running; rebuilding stack")
-        restart_stack()
-        %{state | rtsp_fails: 0}
-
-      true ->
-        %{state | rtsp_fails: state.rtsp_fails + 1}
+    if alive?(state.camd_pid) do
+      check = rtsp_health_check()
+      log_rtsp_health_check(check, state.rtsp_dead_fails, state.rtsp_sprop_fails)
+      escalate_rtsp_health(check, state)
+    else
+      %{state | rtsp_dead_fails: 0, rtsp_sprop_fails: 0}
     end
   end
 
-  defp rtsp_health(state), do: %{state | rtsp_fails: 0}
+  defp rtsp_health(state), do: %{state | rtsp_dead_fails: 0, rtsp_sprop_fails: 0}
+
+  defp escalate_rtsp_health(%{connect: true, response: true, sprop: true}, state) do
+    %{state | rtsp_dead_fails: 0, rtsp_sprop_fails: 0}
+  end
+
+  defp escalate_rtsp_health(%{connect: connect, response: response}, state)
+       when not connect or not response do
+    if state.rtsp_dead_fails + 1 >= @rtsp_dead_fail_threshold do
+      Logger.warning("RTSP server unreachable while camera running; rebuilding stack")
+      restart_stack()
+      %{state | rtsp_dead_fails: 0, rtsp_sprop_fails: 0}
+    else
+      %{state | rtsp_dead_fails: state.rtsp_dead_fails + 1}
+    end
+  end
+
+  defp escalate_rtsp_health(%{sprop: false}, state) do
+    if state.rtsp_sprop_fails + 1 >= @rtsp_sprop_fail_threshold do
+      Logger.warning(
+        "RTSP sprop-parameter-sets still missing after sustained grace period; rebuilding stack"
+      )
+
+      restart_stack()
+      %{state | rtsp_dead_fails: 0, rtsp_sprop_fails: 0}
+    else
+      %{state | rtsp_dead_fails: 0, rtsp_sprop_fails: state.rtsp_sprop_fails + 1}
+    end
+  end
+
+  defp log_rtsp_health_check(check, dead_fails_before, sprop_fails_before) do
+    Logger.info(
+      "RTSP health check: connect=#{check.connect} response=#{check.response} " <>
+        "elapsed_ms=#{check.elapsed_ms} sdp_bytes=#{check.sdp_bytes} " <>
+        "sprop=#{check.sprop} dead_fails=#{dead_fails_before} sprop_fails=#{sprop_fails_before}"
+    )
+  end
 
   # Healthy means: the RTSP server accepts a connection AND its SDP carries
   # sprop-parameter-sets. Just checking the port is not enough — the server
   # can be up yet publish an empty sprop (frame1 SPS missed), which leaves
   # VLC unable to decode. A DESCRIBE reflects exactly what a client sees.
-  defp rtsp_healthy? do
+  #
+  # Returns a diagnostic map (not just a boolean) so the watchdog log can
+  # show exactly what failed: TCP connect, getting any response at all
+  # before the 1.5s deadline, or the response lacking sprop.
+  defp rtsp_health_check do
+    start_ms = System.monotonic_time(:millisecond)
+
     case :gen_tcp.connect(~c"127.0.0.1", @rtsp_port, [:binary, active: false], 1_000) do
       {:ok, socket} ->
         req =
           "DESCRIBE rtsp://127.0.0.1:#{@rtsp_port}/video0_unicast RTSP/1.0\r\n" <>
             "CSeq: 1\r\nAccept: application/sdp\r\n\r\n"
 
-        healthy =
+        sdp =
           case :gen_tcp.send(socket, req) do
-            :ok ->
-              sdp = rtsp_recv(socket, "", System.monotonic_time(:millisecond) + 1_500)
-              String.contains?(sdp, "sprop-parameter-sets=")
-
-            _error ->
-              false
+            :ok -> rtsp_recv(socket, "", System.monotonic_time(:millisecond) + 1_500)
+            _error -> ""
           end
 
         :gen_tcp.close(socket)
-        healthy
+        sprop = String.contains?(sdp, "sprop-parameter-sets=")
+
+        %{
+          connect: true,
+          response: sdp != "",
+          elapsed_ms: System.monotonic_time(:millisecond) - start_ms,
+          sdp_bytes: byte_size(sdp),
+          sprop: sprop
+        }
 
       {:error, _reason} ->
-        false
+        %{
+          connect: false,
+          response: false,
+          elapsed_ms: System.monotonic_time(:millisecond) - start_ms,
+          sdp_bytes: 0,
+          sprop: false
+        }
     end
   end
 
