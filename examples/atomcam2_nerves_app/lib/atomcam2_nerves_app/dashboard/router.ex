@@ -88,7 +88,7 @@ defmodule Atomcam2NervesApp.Dashboard.Router do
   # Night vision: IR-cut + IR LED only (camd's apply_night/1 no longer
   # touches IMP_ISP_Tuning_SetISPRunningMode -- that used to be called
   # inline from the encode loop and could stall the H.264 stream; see
-  # docs/20260804_native_camera_不具合_技術相談.md 問題A). Safe to expose here.
+  # docs/worklog/20260804-ネイティブカメラ不具合の調査.md 問題A). Safe to expose here.
   defp operate("/night/" <> mode) when mode in ["on", "off", "auto"] do
     CameraNative.night_vision(String.to_existing_atom(mode))
     Logger.info("Dashboard: night vision #{mode}")

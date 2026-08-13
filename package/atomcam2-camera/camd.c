@@ -61,7 +61,7 @@
  * from the rootfs, a second full-res channel measurably tinted the image
  * magenta/purple on two independent devices. That was a red herring --
  * the real cause was /etc/sensor/gc2053-t31.bin never having been
- * installed (see docs/20260806_ISPキャリブレーション欠落_技術相談.md).
+ * installed (see docs/worklog/20260806-ISP補正情報欠落の調査.md).
  * Retrying full res now that the calibration file ships with this
  * package. If color regresses again, suspect the calibration file/AWB
  * path first, not this resolution. */

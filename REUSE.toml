@@ -1,0 +1,147 @@
+version = 1
+
+# Project-authored source code and scripts. More specific annotations below
+# override this default for documentation, configuration, and upstream works.
+[[annotations]]
+path = "**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Contributors to nerves_system_atomcam2 <https://github.com/piyopiyoex/nerves_system_atomcam2>"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Documentation and project-created media.
+[[annotations]]
+path = [
+  "README.md",
+  "**/README.md",
+  "docs/**",
+  "package/atomcam2-boot-announce/*.raw",
+  "package/atomcam2-boot-announce/digits/**",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Contributors to nerves_system_atomcam2 <https://github.com/piyopiyoex/nerves_system_atomcam2>"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# Metadata, generated files, and configuration without substantial creative
+# content.
+[[annotations]]
+path = [
+  ".formatter.exs",
+  ".github/workflows/**",
+  ".gitignore",
+  ".tool-versions",
+  "CHANGELOG.md",
+  "NOTICE",
+  "VERSION",
+  "busybox.fragment",
+  "examples/atomcam2_nerves_app/.envrc.example",
+  "examples/atomcam2_nerves_app/mix.lock",
+  "fwup.conf",
+  "mix.lock",
+  "nerves_defconfig",
+  "rootfs_overlay/etc/atomcam2.env",
+  "rootfs_overlay/etc/erlinit.config",
+  "rootfs_overlay/lib/modules/atbm603x_wifi_sdio.ko.source",
+  "toolchain/UPSTREAM",
+  "toolchain/VERSION",
+  "toolchain/defconfig",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "CC0-1.0"
+
+# Buildroot-derived integration files follow Buildroot's license.
+[[annotations]]
+path = [
+  "Config.in",
+  "external.desc",
+  "external.mk",
+  "board/atomcam2/post-build.sh",
+  "package/Config.in",
+  "package/**/Config.in",
+  "package/**/*.mk",
+]
+precedence = "override"
+SPDX-FileCopyrightText = [
+  "The Buildroot developers <buildroot@buildroot.org>",
+  "2026 Contributors to nerves_system_atomcam2 <https://github.com/piyopiyoex/nerves_system_atomcam2>",
+]
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+# Linux kernel-derived configuration and patches.
+[[annotations]]
+path = [
+  "linux-3.10.14.defconfig",
+  "patches/kernel/**",
+]
+precedence = "override"
+SPDX-FileCopyrightText = [
+  "Various Linux kernel contributors",
+  "2026 Contributors to nerves_system_atomcam2 <https://github.com/piyopiyoex/nerves_system_atomcam2>",
+]
+SPDX-License-Identifier = "GPL-2.0-only"
+
+# v4l2loopback is distributed under GPL-2.0-or-later by the selected upstream
+# package; local patches retain that license. Buildroot integration files are
+# covered by the Buildroot annotation above.
+[[annotations]]
+path = "package/atomcam2-v4l2loopback/*.patch"
+precedence = "override"
+SPDX-FileCopyrightText = [
+  "v4l2loopback contributors <https://github.com/v4l2loopback/v4l2loopback>",
+  "2026 Contributors to nerves_system_atomcam2 <https://github.com/piyopiyoex/nerves_system_atomcam2>",
+]
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+# The bundled BusyBox executable and symlinks are GPLv2 works.
+[[annotations]]
+path = [
+  "board/atomcam2/initramfs/bin/**",
+  "board/atomcam2/initramfs/sbin/switch_root",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "BusyBox contributors <https://busybox.net/>"
+SPDX-License-Identifier = "GPL-2.0-only"
+
+# This extracted kernel module identifies itself as GPL in its module metadata.
+[[annotations]]
+path = "rootfs_overlay/lib/modules/atbm603x_wifi_sdio.ko"
+precedence = "override"
+SPDX-FileCopyrightText = "wifi_software <wifi_software@altobeam.com>"
+SPDX-License-Identifier = "GPL-2.0-only"
+
+# Patches to Unlicense projects retain the corresponding upstream license.
+[[annotations]]
+path = [
+  "package/v4l2cpp/*.patch",
+  "package/v4l2rtspserver/*.patch",
+]
+precedence = "override"
+SPDX-FileCopyrightText = [
+  "Upstream v4l2cpp and v4l2rtspserver contributors",
+  "2026 Contributors to nerves_system_atomcam2 <https://github.com/piyopiyoex/nerves_system_atomcam2>",
+]
+SPDX-License-Identifier = "Unlicense"
+
+# The added compatibility header already declares LGPL-2.1-only in the patch.
+[[annotations]]
+path = "patches/libnl/**"
+precedence = "override"
+SPDX-FileCopyrightText = [
+  "libnl contributors <https://github.com/thom311/libnl>",
+  "2026 Contributors to nerves_system_atomcam2 <https://github.com/piyopiyoex/nerves_system_atomcam2>",
+]
+SPDX-License-Identifier = "LGPL-2.1-only"
+
+# The source identifies this classic console font as public domain.
+[[annotations]]
+path = "package/atomcam2-camera/osd_font8x16.h"
+precedence = "override"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "LicenseRef-Public-Domain"
+
+# Extracted device calibration data has no identified redistribution terms.
+[[annotations]]
+path = "package/atomcam2-camera/gc2053-t31.bin"
+precedence = "override"
+SPDX-FileCopyrightText = "NOASSERTION"
+SPDX-License-Identifier = "LicenseRef-AtomCam2-Vendor-Artifact"

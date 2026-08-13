@@ -1,8 +1,8 @@
 defmodule Atomcam2NervesApp.Dashboard do
   @moduledoc """
-  Facade for the status dashboard (see docs/20260803_ダッシュボード_提案書.md).
+  Facade for the status dashboard (see docs/worklog/20260803-状態画面の設計.md).
 
-  The dashboard is off by default; `enable(true)` starts the `:inets`
+  The dashboard is on by default; `enable(true)` starts the `:inets`
   httpd (default port 80) serving:
 
     * `GET /status.json`  — the canonical machine-readable state

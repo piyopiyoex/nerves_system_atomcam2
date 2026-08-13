@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">nerves_system_atomcam2 の構成概要</title>
+  <desc id="desc">起動基盤、A/B ファームウェア、標準のネイティブカメラ、状態画面、任意のベンダー互換機能、永続領域の関係を示す。</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f8fa; }
+      .frame { fill: #ffffff; stroke: #263238; stroke-width: 2; rx: 18; }
+      .section { fill: #eef3f6; stroke: #607d8b; stroke-width: 1.5; rx: 12; }
+      .primary { fill: #e3f2fd; stroke: #1565c0; stroke-width: 2.5; rx: 12; }
+      .optional { fill: #fff8e1; stroke: #f9a825; stroke-width: 1.8; stroke-dasharray: 8 6; rx: 12; }
+      .storage { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.8; rx: 12; }
+      .title { font: 700 30px sans-serif; fill: #17242b; }
+      .subtitle { font: 500 16px sans-serif; fill: #455a64; }
+      .heading { font: 700 20px sans-serif; fill: #17242b; }
+      .label { font: 700 17px sans-serif; fill: #17242b; }
+      .body { font: 14px sans-serif; fill: #37474f; }
+      .small { font: 13px sans-serif; fill: #546e7a; }
+      .arrow { fill: none; stroke: #546e7a; stroke-width: 2.2; marker-end: url(#arrow); }
+      .optionalArrow { fill: none; stroke: #f9a825; stroke-width: 2; stroke-dasharray: 7 5; marker-end: url(#arrowOptional); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#546e7a"/>
+    </marker>
+    <marker id="arrowOptional" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#f9a825"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+  <text class="title" x="60" y="55">nerves_system_atomcam2 構成概要</text>
+  <text class="subtitle" x="60" y="84">標準経路は Nerves 上のネイティブカメラ。ベンダー互換機能と NAS 転送は任意機能として分離する。</text>
+
+  <rect class="frame" x="45" y="115" width="1190" height="545"/>
+
+  <text class="heading" x="80" y="155">起動と更新</text>
+  <rect class="section" x="75" y="175" width="250" height="105"/>
+  <text class="label" x="95" y="208">MicroSD 起動領域</text>
+  <text class="body" x="95" y="237">U-Boot / Linux 3.10</text>
+  <text class="body" x="95" y="260">fwup 管理情報</text>
+
+  <rect class="section" x="75" y="315" width="250" height="145"/>
+  <text class="label" x="95" y="348">Nerves A/B スロット</text>
+  <text class="body" x="95" y="377">現在スロットで通常起動</text>
+  <text class="body" x="95" y="400">候補スロットを検証</text>
+  <text class="body" x="95" y="423">失敗時はロールバック</text>
+
+  <path class="arrow" d="M200 280 L200 312"/>
+
+  <text class="heading" x="390" y="155">標準の実行経路</text>
+  <rect class="primary" x="380" y="175" width="400" height="130"/>
+  <text class="label" x="405" y="208">ネイティブカメラ</text>
+  <text class="body" x="405" y="237">CameraNative → atomcam2-camd</text>
+  <text class="body" x="405" y="260">H.264 → v4l2loopback → RTSP</text>
+  <text class="small" x="405" y="284">起動時に自動開始し、異常時は監視して再構築</text>
+
+  <rect class="section" x="380" y="335" width="190" height="125"/>
+  <text class="label" x="402" y="368">状態画面</text>
+  <text class="body" x="402" y="397">HTTP / JPEG</text>
+  <text class="body" x="402" y="420">状態・ログ・動作確認</text>
+  <text class="small" x="402" y="444">既定有効</text>
+
+  <rect class="section" x="590" y="335" width="190" height="125"/>
+  <text class="label" x="612" y="368">機器補助機能</text>
+  <text class="body" x="612" y="397">起動音声・IP 発声</text>
+  <text class="body" x="612" y="420">状態表示灯・Wi-Fi</text>
+  <text class="small" x="612" y="444">Nerves から統合管理</text>
+
+  <path class="arrow" d="M325 388 L377 388"/>
+  <path class="arrow" d="M580 305 L580 332"/>
+
+  <text class="heading" x="845" y="155">任意互換経路</text>
+  <rect class="optional" x="835" y="175" width="340" height="130"/>
+  <text class="label" x="860" y="208">ベンダーカメラ互換機能</text>
+  <text class="body" x="860" y="237">iCamera_app を隔離実行</text>
+  <text class="body" x="860" y="260">携帯アプリ・従来録画に対応</text>
+  <text class="small" x="860" y="284">明示的に有効化した場合のみ使用</text>
+
+  <rect class="optional" x="835" y="335" width="340" height="125"/>
+  <text class="label" x="860" y="368">NAS 搬出</text>
+  <text class="body" x="860" y="397">完了した従来録画を SFTP 転送</text>
+  <text class="body" x="860" y="420">鍵認証・ホスト鍵確認・再試行</text>
+  <text class="small" x="860" y="444">ネイティブ映像の連続録画機能ではない</text>
+
+  <path class="optionalArrow" d="M1005 305 L1005 332"/>
+
+  <text class="heading" x="80" y="515">永続領域</text>
+  <rect class="storage" x="75" y="535" width="1100" height="85"/>
+  <text class="label" x="100" y="568">/media/mmc</text>
+  <text class="body" x="100" y="594">起動設定・早期に必要な記録</text>
+  <text class="label" x="480" y="568">/data</text>
+  <text class="body" x="480" y="594">設定・ホスト鍵・一時保管</text>
+  <text class="label" x="825" y="568">/tmp</text>
+  <text class="body" x="825" y="594">カメラ制御・状態ファイル</text>
+
+  <path class="arrow" d="M475 460 L475 532"/>
+  <path class="optionalArrow" d="M1005 460 L1005 532"/>
+
+  <text class="small" x="75" y="645">現行仕様の詳細: docs/構成.md　操作方法: docs/運用.md　設計判断: docs/adr/</text>
+</svg>

@@ -1,0 +1,74 @@
+name: CI
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  reuse:
+    name: REUSE compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: fsfe/reuse-action@v6
+
+  shell-checks:
+    name: Shell checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r -d '' file; do
+            case "$(sed -n '1p' "$file")" in
+              *bash*) bash -n "$file" ;;
+              *) sh -n "$file" ;;
+            esac
+          done < <(
+            find scripts examples/atomcam2_nerves_app/scripts \
+              -type f -name '*.sh' -print0
+          )
+
+      - name: Test boot metadata handling
+        run: ./scripts/test-atomcam2-boot-metadata.sh
+
+      - name: Test firmware update handling
+        run: ./scripts/test-atomcam2-firmware-update.sh
+
+  example-tests:
+    name: Example application tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/atomcam2_nerves_app
+    env:
+      ATOMCAM2_SYSTEM_SOURCE: local
+      MIX_ENV: test
+      MIX_TARGET: host
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          elixir-version: "1.20.2"
+
+      - name: Install Mix prerequisites
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix archive.install hex nerves_bootstrap 1.16.0 --force
+
+      - name: Fetch dependencies
+        run: mix deps.get
+
+      - name: Run tests
+        run: mix test

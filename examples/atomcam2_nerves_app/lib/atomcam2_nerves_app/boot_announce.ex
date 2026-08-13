@@ -6,7 +6,7 @@ defmodule Atomcam2NervesApp.BootAnnounce do
   second announcement follows: the device's eth0/wlan0 IPv4 addresses
   read out digit-by-digit (see `announce_ip/0`), built at runtime from
   small pre-synthesized clips under `/usr/share/atomcam2/digits/` (see
-  docs/20260806_起動時IP発声_提案書.md).
+  docs/worklog/20260806-起動時IP発声の実装記録.md).
 
   Cold boots intermittently leave the audio driver broken
   (`IMP_AO_Enable = -1`, no /dev/dsp) even with the correct module load

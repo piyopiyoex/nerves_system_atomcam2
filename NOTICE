@@ -1,0 +1,18 @@
+nerves_system_atomcam2 のライセンス情報
+=========================================
+
+各ファイルの著作権者とライセンスは `REUSE.toml` および `LICENSES/` に記載
+しています。プロジェクトが作成したソースコードは原則 Apache-2.0、文書と
+メディアは CC-BY-4.0、創作性のない設定やメタデータは CC0-1.0 です。
+
+Buildroot、Linux、BusyBox、libnl、v4l2loopback、v4l2cpp、
+v4l2rtspserver に由来するファイルには、それぞれの上流ライセンスが適用
+されます。
+
+`package/atomcam2-camera/gc2053-t31.bin` は Atom Cam 2 実機から取得した
+センサー補正データです。再配布条件を確認できていないため、
+`LicenseRef-AtomCam2-Vendor-Artifact` として明示しています。この識別子は
+利用、複製、改変、再配布の許諾を与えるものではありません。
+
+`rootfs_overlay/lib/modules/atbm603x_wifi_sdio.ko` はモジュール情報で GPL を
+宣言しています。取得元の記録は隣接する `.ko.source` ファイルにあります。
