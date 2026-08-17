@@ -1,0 +1,53 @@
+Fix: when the very first DESCRIBE for the video subsession races the
+capture source's first frame (e.g. right after v4l2rtspserver starts,
+before camd's SPS/PPS have been read even once), wait briefly (bounded,
+3s max) for H264_V4L2DeviceSource::getAuxLine() to become non-empty
+before building the SDP. Once built, this SDP line is cached for the
+process's whole lifetime (OnDemandServerMediaSubsession::fSDPLines), so
+without this a premature empty result here permanently starves RTSP
+clients of sprop-parameter-sets until the next process restart.
+
+Root-caused via `this`-pointer tracing on real hardware: confirmed the
+same H264_V4L2DeviceSource object backs both the capture thread
+(splitFrames(), which does detect SPS/PPS reliably) and this DESCRIBE
+handler -- it's a genuine startup race, not a stale/wrong source
+instance. See docs/20260813_video信頼性_sprop捕捉機構特定_技術相談.md.
+
+--- a/src/ServerMediaSubsession.cpp
++++ b/src/ServerMediaSubsession.cpp
+@@ -8,6 +8,7 @@
+ ** -------------------------------------------------------------------------*/
+ 
+ #include <sstream>
++#include <unistd.h>
+ #include <linux/videodev2.h>
+ 
+ // project
+@@ -119,6 +120,27 @@
+ 			os << rtpSink->auxSDPLine();
+ 		}
+ 		else if (source) {
++			/* atomcam2: the very first DESCRIBE for this subsession can race
++			 * the capture source's first frame -- e.g. right after
++			 * v4l2rtspserver starts, before the encoder's SPS/PPS have been
++			 * read even once. Once this SDP line is built it is cached for
++			 * the process's whole lifetime
++			 * (OnDemandServerMediaSubsession::fSDPLines), so a premature
++			 * empty result here means RTSP clients never see
++			 * sprop-parameter-sets until the next restart. Wait briefly
++			 * (bounded) for the capture thread to produce it before giving
++			 * up -- confirmed via `this`-pointer tracing that this is a
++			 * genuine same-object startup race, not a stale/wrong source
++			 * (see docs/20260813_video信頼性_sprop捕捉機構特定_技術相談.md). */
++			if (source->getAuxLine().empty()) {
++				int waited_ms = 0;
++				while (source->getAuxLine().empty() && waited_ms < 3000) {
++					usleep(100 * 1000);
++					waited_ms += 100;
++				}
++				LOG(NOTICE) << "getAuxLine: waited " << waited_ms << "ms for capture source; sprop "
++					<< (source->getAuxLine().empty() ? "still empty" : "ready");
++			}
+ 			unsigned char rtpPayloadType = rtpSink->rtpPayloadType();
+ 			DeviceInterface* device = source->getDevice();
+ 			os << "a=fmtp:" << int(rtpPayloadType) << " " << source->getAuxLine() << "\r\n";				

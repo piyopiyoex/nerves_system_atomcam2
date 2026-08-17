@@ -103,31 +103,6 @@ defmodule Atomcam2NervesApp.Dashboard.Router do
     reply(200, "application/json", ~s({"status":"ok","message":"test ircut #{mode}"}))
   end
 
-  # Microphone: separate record / playback. Returns the duration as JSON;
-  # the dashboard's JS runs its own countdown against it instead of the
-  # server rendering a whole countdown page (no page navigation).
-  defp operate("/test/mic/record") do
-    Atomcam2NervesApp.HardwareTest.mic_record()
-    Logger.info("Dashboard: mic record")
-
-    reply(
-      200,
-      "application/json",
-      ~s({"status":"ok","seconds":#{Atomcam2NervesApp.HardwareTest.mic_seconds()}})
-    )
-  end
-
-  defp operate("/test/mic/play") do
-    Atomcam2NervesApp.HardwareTest.mic_play()
-    Logger.info("Dashboard: mic play")
-
-    reply(
-      200,
-      "application/json",
-      ~s({"status":"ok","seconds":#{Atomcam2NervesApp.HardwareTest.mic_seconds()}})
-    )
-  end
-
   # Hardware checks (動作確認 tab). These only poke the status LEDs, the IR
   # LED and the speaker — nothing that fights camd or stalls the RTSP stream.
   defp operate("/test/" <> what)

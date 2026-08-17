@@ -22,13 +22,6 @@ defmodule Atomcam2NervesApp.HardwareTest do
   @ircut_b_gpio 52
   @ircut_pulse_ms 300
   @announce_command "/usr/bin/atomcam2-boot-announce"
-  # Mic record + playback (libimp IMP_AI / IMP_AO helpers). They link the
-  # vendor libimp at runtime, so LD_LIBRARY_PATH must point at it.
-  @airec_command "/usr/bin/atomcam2-airec"
-  @aoplay_command "/usr/bin/atomcam2-aoplay"
-  @audio_env [{"LD_LIBRARY_PATH", "/atom/system/lib:/atom/lib"}]
-  @mic_raw "/tmp/mic.raw"
-  @mic_seconds 5
 
   @doc "Blink the blue status LED (GPIO 39) a few times."
   def blue_led, do: StatusLed.test(:blue)
@@ -49,38 +42,6 @@ defmodule Atomcam2NervesApp.HardwareTest do
   def speaker do
     {:ok, _pid} =
       Task.start(fn -> System.cmd(@announce_command, [], stderr_to_stdout: true) end)
-
-    :ok
-  end
-
-  @doc "Recording length in seconds (used by the dashboard countdown)."
-  def mic_seconds, do: @mic_seconds
-
-  @doc """
-  Record ~#{@mic_seconds} s from the microphone (IMP_AI, 8 kHz/16-bit/mono)
-  to #{@mic_raw}. Returns immediately; recording runs in the background.
-  """
-  def mic_record do
-    {:ok, _pid} =
-      Task.start(fn ->
-        System.cmd(@airec_command, [@mic_raw, Integer.to_string(@mic_seconds)],
-          env: @audio_env,
-          stderr_to_stdout: true
-        )
-      end)
-
-    :ok
-  end
-
-  @doc "Play back the last microphone recording (#{@mic_raw}) via IMP_AO."
-  def mic_play do
-    {:ok, _pid} =
-      Task.start(fn ->
-        System.cmd(@aoplay_command, [@mic_raw, "1", "8000", "60"],
-          env: @audio_env,
-          stderr_to_stdout: true
-        )
-      end)
 
     :ok
   end

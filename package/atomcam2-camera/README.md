@@ -39,6 +39,21 @@ iCamera_app を置き換えるネイティブカメラデーモン `atomcam2-cam
   **解像度を上げる場合は crash-free だけでなく画質(色)も必ず
   再検証すること**(rmem クラッシュとは別に、キャリブレーション不備の
   ような副作用が別途あり得る)。
+- **frame1 の write() リトライ(VERSION 37, 2026-08-13)**: `got == 0`
+  (まだ 1 フレームも配信できていない)の間だけ、loopback への
+  `write()` が `ENOTTY`(読み手未接続)で失敗したら最大 5 秒リトライ
+  してから諦める(`GO_PATH` 待ちは固定ヒューリスティックであり、実際に
+  書き込みが通るかどうかの完了確認ではないため)。実機診断の結果、
+  **T31 SDK のエンコーダは実際には毎回の IDR 直前に SPS/PPS を自然に
+  含めている**ことが判明した(2026-08-05 時点の「起動時に一度だけ」
+  という記述は誤りだった)ため、SPS/PPS を camd 側で手動 prepend する
+  対策は不要と判明し撤回した。RTSP の SDP に `sprop-parameter-sets`
+  が乗らない不具合の真因は camd 側ではなく `v4l2rtspserver` 側の
+  SDP キャッシュ生成タイミング(最初の `DESCRIBE` が capture 開始前に
+  来ると空のまま恒久キャッシュされる)にあり、
+  `package/v4l2rtspserver/0005-sprop-startup-race-fix.patch` で対応
+  済み。詳細な調査過程は
+  [docs/worklog/20260813-RTSP映像sprop欠落レースの調査.md](../../docs/worklog/20260813-RTSP映像sprop欠落レースの調査.md)。
 - **ナイトビジョン** `night on|off|auto`: ISP RunningMode(DAY/NIGHT)+
   IR-cut フィルタ(GPIO 53/52 の H ブリッジをパルス)+ IR LED(GPIO 26)。
   auto は `IMP_ISP_Tuning_GetTotalGain` を毎秒監視し、8x で夜・4x で昼に

@@ -1,3 +1,4 @@
+source "$NERVES_DEFCONFIG_DIR/package/atomcam2-aicap/Config.in"
 source "$NERVES_DEFCONFIG_DIR/package/atomcam2-boot-announce/Config.in"
 source "$NERVES_DEFCONFIG_DIR/package/atomcam2-camera/Config.in"
 source "$NERVES_DEFCONFIG_DIR/package/atomcam2-compat-headers/Config.in"

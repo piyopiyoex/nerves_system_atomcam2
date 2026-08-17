@@ -1,0 +1,278 @@
+Add an ALSA-free audio path: a new FifoAudioCapture DeviceInterface that
+reads raw S16_BE mono PCM from a named pipe (fed by the new
+atomcam2-aicap daemon, which does the actual IMP_AI microphone capture)
+instead of ALSACapture. This board's control kernel has no ALSA
+drivers, only OSS, so upstream's ALSA audio path (already excluded by
+0002-video-only-makefile.patch) is not an option. Reuses the existing
+generic V4L2DeviceSource/StreamReplicator/UnicastServerMediaSubsession
+plumbing unchanged -- it already works for any DeviceInterface, not
+just V4L2 devices. See docs/20260812_RTSP_音声追加_提案書.md.
+
+The device argument keeps the existing "[V4L2 device][,audio device]"
+convention (main.cpp's decodeDevice()); the part after the comma is now
+a FIFO path instead of an ALSA device name, e.g.
+"/dev/video0,/tmp/camd-audio.fifo".
+
+diff -ruN a/Makefile b/Makefile
+--- a/Makefile	2026-08-12 23:00:33.360689193 +0900
++++ b/Makefile	2026-08-12 23:03:56.788634263 +0900
+@@ -27,7 +27,8 @@
+ 	src/ServerMediaSubsession.o \
+ 	src/TSServerMediaSubsession.o \
+ 	src/UnicastServerMediaSubsession.o \
+-	src/V4l2RTSPServer.o
++	src/V4l2RTSPServer.o \
++	src/FifoAudioCapture.o
+ 
+ .DEFAULT_GOAL := all
+ 
+diff -ruN a/inc/BaseServerMediaSubsession.h b/inc/BaseServerMediaSubsession.h
+--- a/inc/BaseServerMediaSubsession.h	2026-08-12 22:55:36.650285968 +0900
++++ b/inc/BaseServerMediaSubsession.h	2026-08-12 23:01:31.510637136 +0900
+@@ -107,9 +107,17 @@
+                     break;
+             }
+             os << "/" << sampleRate << "/" << channels;
+-#endif            
++#else
++            // atomcam2: no ALSA on this board (see FifoAudioCapture); the
++            // only non-ALSA audio source is the FIFO capture, which always
++            // produces S16_BE PCM, i.e. RTP "L16".
++            if (sampleRate > 0)
++            {
++                os << "audio/L16/" << sampleRate << "/" << channels;
++            }
++#endif
+             return os.str();
+-        }        
++        }
+ 	
+ 	public:
+ 		static FramedSource* createSource(UsageEnvironment& env, FramedSource * videoES, const std::string& format);
+diff -ruN a/inc/FifoAudioCapture.h b/inc/FifoAudioCapture.h
+--- a/inc/FifoAudioCapture.h	1970-01-01 09:00:00.000000000 +0900
++++ b/inc/FifoAudioCapture.h	2026-08-12 23:01:01.515844193 +0900
+@@ -0,0 +1,41 @@
++/* ---------------------------------------------------------------------------
++** atomcam2: FIFO-based audio capture, ALSA-free.
++**
++** This board's control kernel has no ALSA drivers (OSS only), so
++** upstream's ALSACapture cannot be built here. atomcam2-aicap (a small
++** libimp/IMP_AI daemon, built with the vendor uClibc toolchain like
++** camd) captures the microphone continuously and writes raw S16_BE
++** mono PCM into a named pipe. This class just reads that pipe as a
++** DeviceInterface, so the existing generic V4L2DeviceSource /
++** StreamReplicator / UnicastServerMediaSubsession plumbing (already
++** used for video) can drive an "audio/L16" RTP subsession unchanged.
++**
++** -------------------------------------------------------------------------*/
++
++#pragma once
++
++#include <string>
++
++#include "DeviceInterface.h"
++
++class FifoAudioCapture : public DeviceInterface
++{
++	public:
++		static FifoAudioCapture* createNew(const std::string & path, int sampleRate, int channels);
++		virtual ~FifoAudioCapture();
++
++		virtual size_t         read(char* buffer, size_t bufferSize);
++		virtual int            getFd()          { return m_fd;         }
++		virtual unsigned long  getBufferSize()  { return m_bufferSize; }
++		virtual int            getSampleRate()  { return m_sampleRate; }
++		virtual int            getChannels()    { return m_channels;   }
++
++	protected:
++		FifoAudioCapture(int fd, int sampleRate, int channels, unsigned long bufferSize);
++
++	private:
++		int           m_fd;
++		int           m_sampleRate;
++		int           m_channels;
++		unsigned long m_bufferSize;
++};
+diff -ruN a/inc/V4l2RTSPServer.h b/inc/V4l2RTSPServer.h
+--- a/inc/V4l2RTSPServer.h	2026-08-12 23:00:33.363057365 +0900
++++ b/inc/V4l2RTSPServer.h	2026-08-12 23:03:28.015832885 +0900
+@@ -21,6 +21,7 @@
+ #include "MulticastServerMediaSubsession.h"
+ #include "TSServerMediaSubsession.h"
+ #include "HTTPServer.h"
++#include "FifoAudioCapture.h"
+ 
+ class V4l2RTSPServer {
+     public:
+@@ -83,6 +84,11 @@
+ 					int queueSize, V4L2DeviceSource::CaptureMode captureMode, int repeatConfig,
+ 					const std::string& outputFile, V4l2IoType ioTypeOut, V4l2Output*& out);
+ 
++        // atomcam2: ALSA-free audio replicator (see FifoAudioCapture.h).
++        StreamReplicator* CreateFifoAudioReplicator(
++			const std::string& fifoPath, int sampleRate, int channels,
++			int queueSize, V4L2DeviceSource::CaptureMode captureMode);
++
+ #ifdef HAVE_ALSA
+         StreamReplicator* CreateAudioReplicator(
+ 			const std::string& audioDev, const std::list<snd_pcm_format_t>& audioFmtList, int audioFreq, int audioNbChannels, int verbose,
+diff -ruN a/main.cpp b/main.cpp
+--- a/main.cpp	2026-08-12 23:00:33.364577475 +0900
++++ b/main.cpp	2026-08-12 23:03:42.183735082 +0900
+@@ -297,7 +297,15 @@
+ #ifdef HAVE_ALSA
+ 			audioReplicator = rtspServer.CreateAudioReplicator(
+ 					audioDev, audioFmtList, audioFreq, audioNbChannels, verbose,
+-					queueSize, captureMode);		
++					queueSize, captureMode);
++#else
++			// atomcam2: no ALSA on this board. audioDev (the part after
++			// the comma in the device argument, e.g.
++			// "/dev/video0,/tmp/camd-audio.fifo") is a FIFO written by
++			// atomcam2-aicap instead of an ALSA device name. Fixed
++			// 8kHz mono to match that daemon's IMP_AI configuration.
++			audioReplicator = rtspServer.CreateFifoAudioReplicator(
++					audioDev, 8000, 1, queueSize, captureMode);
+ #endif
+ 					
+ 										
+diff -ruN a/src/FifoAudioCapture.cpp b/src/FifoAudioCapture.cpp
+--- a/src/FifoAudioCapture.cpp	1970-01-01 09:00:00.000000000 +0900
++++ b/src/FifoAudioCapture.cpp	2026-08-12 23:01:16.699739377 +0900
+@@ -0,0 +1,90 @@
++/* ---------------------------------------------------------------------------
++** atomcam2: FIFO-based audio capture, ALSA-free. See FifoAudioCapture.h.
++** -------------------------------------------------------------------------*/
++
++#include <fcntl.h>
++#include <unistd.h>
++#include <errno.h>
++#include <string.h>
++
++#include "FifoAudioCapture.h"
++#include "logger.h"
++
++// atomcam2-aicap writes one IMP_AI frame (400 samples @ 8kHz = 50ms) per
++// write() call; read() below always returns exactly one such chunk so
++// every live555 "frame" is a fixed, known duration (steady RTP timestamps).
++#define FIFO_CHUNK_SAMPLES 400
++
++FifoAudioCapture* FifoAudioCapture::createNew(const std::string & path, int sampleRate, int channels)
++{
++	// O_NONBLOCK so open() does not block this constructor call forever
++	// if atomcam2-aicap has not started writing yet; poll for the writer
++	// instead, then drop back to blocking reads.
++	int fd = -1;
++	for (int tries = 0; tries < 50 && fd < 0; tries++)
++	{
++		fd = open(path.c_str(), O_RDONLY | O_NONBLOCK);
++		if (fd < 0)
++		{
++			if (errno != ENXIO)
++			{
++				LOG(ERROR) << "FifoAudioCapture: cannot open " << path << " : " << strerror(errno);
++				return NULL;
++			}
++			usleep(200000);
++		}
++	}
++	if (fd < 0)
++	{
++		LOG(ERROR) << "FifoAudioCapture: timed out waiting for a writer on " << path;
++		return NULL;
++	}
++
++	int flags = fcntl(fd, F_GETFL, 0);
++	fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
++
++	unsigned long bufferSize = (unsigned long)FIFO_CHUNK_SAMPLES * channels * 2; // 16-bit samples
++	LOG(NOTICE) << "FifoAudioCapture: " << path << " rate:" << sampleRate << " channels:" << channels << " chunk:" << bufferSize;
++	return new FifoAudioCapture(fd, sampleRate, channels, bufferSize);
++}
++
++FifoAudioCapture::FifoAudioCapture(int fd, int sampleRate, int channels, unsigned long bufferSize)
++	: m_fd(fd), m_sampleRate(sampleRate), m_channels(channels), m_bufferSize(bufferSize)
++{
++}
++
++FifoAudioCapture::~FifoAudioCapture()
++{
++	if (m_fd >= 0)
++	{
++		close(m_fd);
++	}
++}
++
++// Always returns a full bufferSize chunk (or an error): loops over
++// short reads, and rides out the writer restarting (read() returning 0
++// on EOF when atomcam2-aicap closes/reopens its end).
++size_t FifoAudioCapture::read(char* buffer, size_t bufferSize)
++{
++	size_t total = 0;
++	while (total < bufferSize)
++	{
++		ssize_t n = ::read(m_fd, buffer + total, bufferSize - total);
++		if (n > 0)
++		{
++			total += (size_t)n;
++		}
++		else if (n == 0)
++		{
++			// writer side closed; back off briefly, keep waiting for it
++			// to come back rather than treating this as a fatal error.
++			usleep(100000);
++		}
++		else if (errno != EINTR)
++		{
++			LOG(ERROR) << "FifoAudioCapture: read error " << strerror(errno);
++			return (size_t)-1;
++		}
++	}
++	return total;
++}
+diff -ruN a/src/V4l2RTSPServer.cpp b/src/V4l2RTSPServer.cpp
+--- a/src/V4l2RTSPServer.cpp	2026-08-12 23:02:39.144170251 +0900
++++ b/src/V4l2RTSPServer.cpp	2026-08-12 23:03:04.657994126 +0900
+@@ -19,6 +19,7 @@
+ #include "DeviceSourceFactory.h"
+ #include "V4l2RTSPServer.h"
+ #include "VideoCaptureAccess.h"
++#include "FifoAudioCapture.h"
+ 
+ #ifdef HAVE_ALSA
+ #include "ALSACapture.h"
+@@ -71,6 +72,33 @@
+ 	return videoReplicator;
+ }
+ 
++// atomcam2: ALSA-free audio replicator. Reads raw S16_BE mono PCM from a
++// FIFO fed by atomcam2-aicap (a small libimp/IMP_AI daemon, see
++// package/atomcam2-aicap/) instead of an ALSA capture device -- this
++// board's control kernel has no ALSA drivers, only OSS. See
++// FifoAudioCapture.h and docs/20260812_RTSP_音声追加_提案書.md.
++StreamReplicator* V4l2RTSPServer::CreateFifoAudioReplicator(
++			const std::string& fifoPath, int sampleRate, int channels,
++			int queueSize, V4L2DeviceSource::CaptureMode captureMode) {
++	StreamReplicator* audioReplicator = NULL;
++	if (!fifoPath.empty())
++	{
++		LOG(NOTICE) << "Create FIFO audio Source..." << fifoPath;
++
++		FifoAudioCapture* audioCapture = FifoAudioCapture::createNew(fifoPath, sampleRate, channels);
++		if (audioCapture)
++		{
++			audioReplicator = DeviceSourceFactory::createStreamReplicator(this->env(), -1, audioCapture, queueSize, captureMode);
++			if (audioReplicator == NULL)
++			{
++				LOG(FATAL) << "Unable to create source for device " << fifoPath;
++				delete audioCapture;
++			}
++		}
++	}
++	return audioReplicator;
++}
++
+ std::string getVideoDeviceName(const std::string & devicePath)
+ {
+ 	std::string deviceName(devicePath);
