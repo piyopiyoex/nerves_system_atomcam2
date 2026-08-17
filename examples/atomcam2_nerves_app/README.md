@@ -67,7 +67,7 @@ mix upload nerves.local
 
 ## 開発時にローカルの system を使う
 
-既定では GitHub Release の `v0.5.0` を取得します。このリポジトリ内の system を
+既定では GitHub Release の `v0.6.0` を取得します。このリポジトリ内の system を
 直接使って変更を確認する場合は次を設定します。
 
 ```sh
