@@ -3,7 +3,9 @@
 [![CI](https://github.com/piyopiyoex/nerves_system_atomcam2/actions/workflows/ci.yml/badge.svg)](https://github.com/piyopiyoex/nerves_system_atomcam2/actions/workflows/ci.yml)
 [![REUSE status](https://api.reuse.software/badge/github.com/piyopiyoex/nerves_system_atomcam2)](https://api.reuse.software/info/github.com/piyopiyoex/nerves_system_atomcam2)
 
-Atom Cam 2 で Elixir と Nerves を動かすための実験的な Nerves system です。
+[Atom Cam 2](https://www.atomtech.co.jp/products/atomcam2) で Elixir と Nerves を
+動かすための実験的な Nerves system です。同じ MicroSD カードで
+[Wyze Cam v3](https://global.wyze.com/ja-jp/products/wyze-cam) も動作したとの報告があります。
 
 現行版は `0.6.0` です。Nerves の起動、ネットワーク接続、SSH、A/B
 ファームウェア更新に加え、ネイティブカメラ、RTSP 配信(映像 + マイク音声)、
